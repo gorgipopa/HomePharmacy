@@ -1,45 +1,45 @@
 package com.example.homepharmacy.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.homepharmacy.data.Medicine
+import com.example.homepharmacy.data.PharmacyRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-class MedicineViewModel : ViewModel() {
+class MedicineViewModel(private val repository: PharmacyRepository) : ViewModel() {
 
-    // Тестовые данные (позже заменим на Room)
-    private val allMedicines = listOf(
-        Medicine(1, "Парацетамол", "Таблетки", System.currentTimeMillis() + TimeUnit.DAYS.toMillis(5), 10),
-        Medicine(2, "Ибупрофен", "Таблетки", System.currentTimeMillis() + TimeUnit.DAYS.toMillis(30), 5),
-        Medicine(3, "Амброксол", "Сироп", System.currentTimeMillis() + TimeUnit.DAYS.toMillis(2), 1),
-        Medicine(4, "Витамин C", "Таблетки", System.currentTimeMillis() + TimeUnit.DAYS.toMillis(100), 50)
-    )
-
-    // Текущий выбранный фильтр (null = показать все)
     private val _selectedForm = MutableStateFlow<String?>(null)
     val selectedForm: StateFlow<String?> = _selectedForm.asStateFlow()
 
-    // Отфильтрованный и отсортированный список
-    private val _medicines = MutableStateFlow<List<Medicine>>(emptyList())
-    val medicines: StateFlow<List<Medicine>> = _medicines.asStateFlow()
+    // Реактивный список из Room: при смене фильтра flatMapLatest переподписывается
+    val medicines: StateFlow<List<Medicine>> = _selectedForm
+        .flatMapLatest { form -> repository.getMedicines(form) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
 
     init {
-        updateList()
+        // Наполняем БД тестовыми данными при первом запуске
+        viewModelScope.launch {
+            repository.seedIfEmpty()
+        }
     }
 
     fun setFilter(form: String?) {
         _selectedForm.value = form
-        updateList()
     }
 
-    private fun updateList() {
-        val filtered = if (_selectedForm.value == null) {
-            allMedicines
-        } else {
-            allMedicines.filter { it.form == _selectedForm.value }
+    fun deleteMedicine(medicine: Medicine) {
+        viewModelScope.launch {
+            repository.deleteMedicine(medicine)
         }
-        // Сортировка по сроку годности: сначала те, что скоро истекают
-        _medicines.value = filtered.sortedBy { it.expirationDate }
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.homepharmacy.data.Medicine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
